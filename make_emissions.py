@@ -201,29 +201,42 @@ def _read_nc(filename, var):
     nc_fid.close()
     return np.squeeze(out)
 
-def grid_area(lon,lat):
-    '''
-    calculate the area of the grid boxes.
-    lon,lat are the longitude and latitude arrays
-    return an numpy array of dimension (nlon,nlat) with the values of the areas
-    '''
-    import numpy as np
+from pyproj import Geod
 
-    rearth = 6370000.
-    nx = lon.shape[0]
-    ny = lat.shape[0]
-    dx = lon[1]-lon[0]
-    dy = lat[2]-lat[1]
-    area = np.zeros([nx,ny])
-    for nla, la in enumerate(lat[1:]):
-        area[:,nla+1] = 2.*np.pi*rearth*rearth*dx/360.*\
-          (np.sin((la+dy/2)*np.pi/180.)-np.sin((la-dy/2)*np.pi/180))
-    area[:,-1] =  2*np.pi*rearth*rearth*\
-      (1.-np.sin((lat[-1]-dy/2)*np.pi/180))*dx/360.
-    area[:,0] = area[:,-1]
-    return area
+def grid_area(lat, lon, fill_value=0.0):
+    """
+    Calculate area (m²) of each cell in an irregular 2D lat/lon grid.
+    Output is resized to match original shape with padding.
 
-def NEI_extracter(emis, specie_info, date_i, lon_org, lat_org):
+    Parameters:
+        lat (2D array): Latitude in degrees
+        lon (2D array): Longitude in degrees
+        fill_value (float): Value to fill in padded edge cells (default: 0.0)
+    
+    Returns:
+        area (2D array): Area of grid cells in m², shape (nlat, nlon)
+    """
+    geod = Geod(ellps='WGS84')
+    nlat, nlon = lat.shape
+    area_core = np.empty((nlat - 1, nlon - 1), dtype=np.float64)
+
+    # Precompute points for all cells
+    for i in range(nlat - 1):
+        lat_t = lat[i:i+2, :]  # (2, nlon)
+        lon_t = lon[i:i+2, :]  # (2, nlon)
+        for j in range(nlon - 1):
+            # Corner points of cell (i,j) in counter-clockwise order
+            lons = [lon_t[0, j], lon_t[0, j+1], lon_t[1, j+1], lon_t[1, j]]
+            lats = [lat_t[0, j], lat_t[0, j+1], lat_t[1, j+1], lat_t[1, j]]
+            area_core[i, j], _ = geod.polygon_area_perimeter(lons, lats)
+
+    # Pad to match original shape
+    area_full = np.full((nlat, nlon), fill_value)
+    area_full[:-1, :-1] = np.abs(area_core)
+
+    return area_full
+
+def NEI_extracter(tri1, tri2, emis, specie_info, date_i, lon_org, lat_org):
     # we need to merge NEI-2016 with QFED
     # NEI2016
     NEI_file = "/discover/nobackup/asouri/SHARED/NEI_2016/nei2016_monthly/2016fh_16j_merge_0pt1degree_month_" +\
@@ -236,15 +249,15 @@ def NEI_extracter(emis, specie_info, date_i, lon_org, lat_org):
        dataset.close()
     except:
        print(f"GC files does not have any values for {emis}")
-       return np.zeros((np.shape(NEI_emis_mapped)[0],np.shape(NEI_emis_mapped)[1],25))
+       return np.zeros((np.shape(lon_org)[0],np.shape(lon_org)[1],25))
     lon_NEI = _read_nc(NEI_file, "lon")
     lat_NEI = _read_nc(NEI_file, "lat")
     lon_NEI, lat_NEI = np.meshgrid(lon_NEI, lat_NEI)
-    points = np.zeros((np.size(lon_NEI), 2))
-    points[:, 0] = lon_NEI.flatten()
-    points[:, 1] = lat_NEI.flatten()
-    tri = Delaunay(points)
-    interpolator = NearestNDInterpolator(tri, (NEI_emis[:, :]).flatten())
+    #points = np.zeros((np.size(lon_NEI), 2))
+    #points[:, 0] = lon_NEI.flatten()
+    #points[:, 1] = lat_NEI.flatten()
+    #tri = Delaunay(points)
+    interpolator = NearestNDInterpolator(tri1, (NEI_emis[:, :]).flatten())
     NEI_emis_mapped = interpolator((lon_org, lat_org))
     # remove data outside of lon_NEI and lat_NEI max and mins
     inside_box = (
@@ -269,17 +282,17 @@ def NEI_extracter(emis, specie_info, date_i, lon_org, lat_org):
         "/discover/nobackup/asouri/SHARED/NEI_2016/diurnal_scales/GRIDCRO2D_20190201.nc4", 'LAT')
     lon_scale = _read_nc(
         "/discover/nobackup/asouri/SHARED/NEI_2016/diurnal_scales/GRIDCRO2D_20190201.nc4", 'LON')
-    points = np.zeros((np.size(lat_scale), 2))
-    points[:, 0] = lon_scale.flatten()
-    points[:, 1] = lat_scale.flatten()
-    tri = Delaunay(points)
+    #points = np.zeros((np.size(lat_scale), 2))
+    #points[:, 0] = lon_scale.flatten()
+    #points[:, 1] = lat_scale.flatten()
+    #tri = Delaunay(points)
     emis_to_saved = np.zeros((np.shape(NEI_emis_mapped)[0],np.shape(NEI_emis_mapped)[1],25))
     for hour in range(0, 25):
         hour_t = hour # we need to have a 25th index in CMAQ
         if hour == 24:
            hour_t = 23
         interpolator = NearestNDInterpolator(
-            tri, (diurnal_scales[hour_t, :, :]).flatten())
+            tri2, (diurnal_scales[hour_t, :, :]).flatten())
         diurnal_scales_mapped = interpolator((lon_org, lat_org))
         # make the dirunal scales = 1.0 outside of the domain
         inside_box = (
@@ -292,8 +305,9 @@ def NEI_extracter(emis, specie_info, date_i, lon_org, lat_org):
         diurnal_scales_mapped = np.where(
             inside_box, diurnal_scales_mapped, 1.0)
         emis_to_saved[:,:,hour] = diurnal_scales_mapped * NEI_emis_mapped
-        area = grid_area(lon_org,lat_org)
-        emis_to_saved[:,:,hour] = emis_to_saved[:,:,hour]*area/1000.0 # this is now g/s
+        #area = grid_area(lon_org,lat_org)
+        area = 8000.0**2
+        emis_to_saved[:,:,hour] = emis_to_saved[:,:,hour]*area*1000.0 # this is now g/s
 
 
     if unit_NEI_GC == 'kg/m2/s':
@@ -312,18 +326,37 @@ def QFED_extracter(emis,  date_i, lon_org, lat_org):
 if __name__ == "__main__":
 
     skeleton = "./emis_mole_all_20171226_12US1_nobeis_norwc_WR413_MYR_2017.nc4"
-    lat_org = _read_nc('./GRIDCRO2D_org.nc','LAT')
-    lon_org = _read_nc('./GRIDCRO2D_org.nc','LON')
+    lat_org = _read_nc('./GRIDCRO2D.nc','LAT')
+    lon_org = _read_nc('./GRIDCRO2D.nc','LON')
     CB06_map = _cb06_mapping()
     data_output = {}
     grid_info = {
-      'nrows': 487,
-      'ncols': 757,
-      'tsteps': 25,
-      'nlays': 1
+       'nrows': 442,
+       'ncols': 667,
+       'tsteps': 25,
+       'nlays': 1
     }
+    # to increase the speed, let's make tri
+    NEI_file = "/discover/nobackup/asouri/SHARED/NEI_2016/nei2016_monthly/2016fh_16j_merge_0pt1degree_month_" +\
+        "01" + ".ncf"
+    lon_NEI = _read_nc(NEI_file, "lon")
+    lat_NEI = _read_nc(NEI_file, "lat")
+    lon_NEI, lat_NEI = np.meshgrid(lon_NEI, lat_NEI)
+    points = np.zeros((np.size(lon_NEI), 2))
+    points[:, 0] = lon_NEI.flatten()
+    points[:, 1] = lat_NEI.flatten()
+    tri1 = Delaunay(points)
+
+    lat_scale = _read_nc(
+        "/discover/nobackup/asouri/SHARED/NEI_2016/diurnal_scales/GRIDCRO2D_20190201.nc4", 'LAT')
+    lon_scale = _read_nc(
+        "/discover/nobackup/asouri/SHARED/NEI_2016/diurnal_scales/GRIDCRO2D_20190201.nc4", 'LON')
+    points = np.zeros((np.size(lat_scale), 2))
+    points[:, 0] = lon_scale.flatten()
+    points[:, 1] = lat_scale.flatten()
+    tri2 = Delaunay(points)
     # loop over whole days ranging from 2023 till the end of 2024
-    for date_i in _daterange(datetime.date(2023, 1, 1), datetime.date(2023, 2, 1)):
+    for date_i in _daterange(datetime.date(2023, 1, 1), datetime.date(2023, 1, 2)):
         with Dataset(skeleton, 'r') as dataset:
          # Iterate over all variables
             for var_name in dataset.variables:
@@ -333,11 +366,11 @@ if __name__ == "__main__":
                     print(f"Processing 4D variable: {var_name}")
                     # read unit
                     unit = getattr(dataset.variables[var_name], 'units')
-               
-                    data_output[var_name] = NEI_extracter(var_name, CB06_map[var_name], date_i, lon_org, lat_org, 
-                                                          date_i.strftime("%Y%j"),
-                                                          (date_i + datetime.timedelta(days=1)).strftime('%Y%j'))
+                    result =  NEI_extracter(tri1, tri2, var_name, CB06_map[var_name], date_i, lon_org, lat_org)
+                    result = np.moveaxis(result, -1, 0)  # Now shape is (25, 487, 757)
+                    data_output[var_name] = np.expand_dims(result, axis=1)
         create_emissions_template('./emis_mole_all_20171226_12US1_nobeis_norwc_WR413_MYR_2017.nc4',
-                                  './test.nc',grid_info,data_output)                    
+                                  './test.nc',grid_info,data_output, date_i.strftime("%Y%j"),
+                                  (date_i + datetime.timedelta(days=1)).strftime('%Y%j'))
 
 

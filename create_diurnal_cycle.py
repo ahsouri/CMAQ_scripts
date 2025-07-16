@@ -66,8 +66,8 @@ for month in range(1,13):
             #lat = _read_nc(f,'lat')
             #lon = _read_nc(f,'lon')
             # calculate the diurnal cycle
-            sum_emis = np.mean(emis[:,:,:], axis=0).squeeze()
-            diurnal_scaling_emis = emis[:,:,:]/sum_emis
+            mean_emis = np.mean(emis[:,:,:], axis=0).squeeze()
+            diurnal_scaling_emis = emis[:,:,:]/mean_emis
             mass_factor = np.sum(emis[:,:,:],axis=0)/\
                           np.sum(emis[:,:,:]*diurnal_scaling_emis,axis=0)
             diurnal_scaling_emis = diurnal_scaling_emis*mass_factor
