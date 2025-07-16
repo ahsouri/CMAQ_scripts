@@ -179,9 +179,26 @@ def create_emissions_template(source_file, output_file, grid_dims, data_dict, da
         'NCOLS': new_ncols,
         'NROWS': new_nrows,
         'NLAYS': new_nlays,
-        'NVARS': new_nvars
+        'NVARS': new_nvars,
+        'SDATE': date_value1,
+        'P_ALP': 38.9799995422363,
+        'P_BET': 38.9799995422363,
+        'P_GAM': -100.212997436523,
+        'XCENT': -100.212997436523,
+        'YCENT': 38.5340003967285,
+        'XORIG': -2399755,
+        'YORIG': -1640765,
+        'XCELL': 8000,
+        'YCELL': 8000
     })
-    
+
+
+    ds_new.attrs.update({
+        'NCOLS': new_ncols,
+        'NROWS': new_nrows,
+        'NLAYS': new_nlays,
+        'NVARS': new_nvars
+    })    
     # Save to file
     ds_new.to_netcdf(output_file)
     
@@ -309,13 +326,14 @@ def NEI_extracter(tri1, tri2, emis, specie_info, date_i, lon_org, lat_org):
         area = 8000.0**2
         emis_to_saved[:,:,hour] = emis_to_saved[:,:,hour]*area*1000.0 # this is now g/s
 
-
+    print(unit_NEI_GC)
     if unit_NEI_GC == 'kg/m2/s':
             emis_to_saved = emis_to_saved/specie_info["molecular_mass"] # now this is moles/s
     elif unit_NEI_GC == 'kgNO2/m2/s':
-            emis_to_saved = emis_to_saved*(30.0/46.0)
+            emis_to_saved = emis_to_saved*(30.0/46.0)/specie_info["molecular_mass"]
+            print('hello')
     elif unit_NEI_GC == 'kgC/m2/s':
-            emis_to_saved = emis_to_saved*specie_info["molecular_mass"]/(12.01*specie_info["num_carbons"])
+            emis_to_saved = emis_to_saved*specie_info["molecular_mass"]/(12.01*specie_info["num_carbons"])/specie_info["molecular_mass"]
     else:
         raise ValueError("The unit is undefined, please check the data")      
     return emis_to_saved
@@ -331,11 +349,12 @@ if __name__ == "__main__":
     CB06_map = _cb06_mapping()
     data_output = {}
     grid_info = {
-       'nrows': 442,
-       'ncols': 667,
+       'nrows': 440,
+       'ncols': 710,
        'tsteps': 25,
        'nlays': 1
     }
+
     # to increase the speed, let's make tri
     NEI_file = "/discover/nobackup/asouri/SHARED/NEI_2016/nei2016_monthly/2016fh_16j_merge_0pt1degree_month_" +\
         "01" + ".ncf"
@@ -369,6 +388,9 @@ if __name__ == "__main__":
                     result =  NEI_extracter(tri1, tri2, var_name, CB06_map[var_name], date_i, lon_org, lat_org)
                     result = np.moveaxis(result, -1, 0)  # Now shape is (25, 487, 757)
                     data_output[var_name] = np.expand_dims(result, axis=1)
+        # scaling due to the year of our target (2023) while using 2016 emissions
+        data_output['NO'] = 0.75*data_output['NO']
+        data_output['NO2'] = 0.75*data_output['NO2']
         create_emissions_template('./emis_mole_all_20171226_12US1_nobeis_norwc_WR413_MYR_2017.nc4',
                                   './test.nc',grid_info,data_output, date_i.strftime("%Y%j"),
                                   (date_i + datetime.timedelta(days=1)).strftime('%Y%j'))
