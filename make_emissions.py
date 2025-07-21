@@ -180,7 +180,7 @@ def create_emissions_template(source_file, output_file, grid_dims, data_dict, da
         'NROWS': new_nrows,
         'NLAYS': new_nlays,
         'NVARS': new_nvars,
-        'SDATE': date_value1,
+        'SDATE': int(date_value1),
         'P_ALP': 38.9799995422363,
         'P_BET': 38.9799995422363,
         'P_GAM': -100.212997436523,
@@ -341,6 +341,29 @@ def NEI_extracter(tri1, tri2, emis, specie_info, date_i, lon_org, lat_org):
 def QFED_extracter(emis,  date_i, lon_org, lat_org):
     # QFED emissions should be vertically allocated (65% within PBL and 35% in the free troposphere)
     pass
+
+def process_emis(skeleton,tri1,tri2,CB06_map,date_i,lon_org,lat_org,output_file):
+
+     with Dataset(skeleton, 'r') as dataset:
+         # Iterate over all variables
+         for var_name in dataset.variables:
+             var = dataset.variables[var_name]
+             # Check if variable has 2 dimensions
+             if len(var.dimensions) == 4:
+                    print(f"Processing 4D variable: {var_name}")
+                    # read unit
+                    unit = getattr(dataset.variables[var_name], 'units')
+                    result =  NEI_extracter(tri1, tri2, var_name, CB06_map[var_name], date_i, lon_org, lat_org)
+                    result = np.moveaxis(result, -1, 0)  # Now shape is (25, 487, 757)
+                    data_output[var_name] = np.expand_dims(result, axis=1)
+     # scaling due to the year of our target (2023) while using 2016 emissions
+     data_output['NO'] = 0.75*data_output['NO']
+     data_output['NO2'] = 0.75*data_output['NO2']
+     create_emissions_template('./emis_mole_all_20171226_12US1_nobeis_norwc_WR413_MYR_2017.nc4',
+                                  output_file,grid_info,data_output, date_i.strftime("%Y%j"),
+                                  (date_i + datetime.timedelta(days=1)).strftime('%Y%j'))
+     return None
+
 if __name__ == "__main__":
 
     skeleton = "./emis_mole_all_20171226_12US1_nobeis_norwc_WR413_MYR_2017.nc4"
@@ -375,24 +398,12 @@ if __name__ == "__main__":
     points[:, 1] = lat_scale.flatten()
     tri2 = Delaunay(points)
     # loop over whole days ranging from 2023 till the end of 2024
-    for date_i in _daterange(datetime.date(2023, 1, 1), datetime.date(2023, 1, 2)):
-        with Dataset(skeleton, 'r') as dataset:
-         # Iterate over all variables
-            for var_name in dataset.variables:
-                var = dataset.variables[var_name]
-                # Check if variable has 2 dimensions
-                if len(var.dimensions) == 4:
-                    print(f"Processing 4D variable: {var_name}")
-                    # read unit
-                    unit = getattr(dataset.variables[var_name], 'units')
-                    result =  NEI_extracter(tri1, tri2, var_name, CB06_map[var_name], date_i, lon_org, lat_org)
-                    result = np.moveaxis(result, -1, 0)  # Now shape is (25, 487, 757)
-                    data_output[var_name] = np.expand_dims(result, axis=1)
-        # scaling due to the year of our target (2023) while using 2016 emissions
-        data_output['NO'] = 0.75*data_output['NO']
-        data_output['NO2'] = 0.75*data_output['NO2']
-        create_emissions_template('./emis_mole_all_20171226_12US1_nobeis_norwc_WR413_MYR_2017.nc4',
-                                  './test.nc',grid_info,data_output, date_i.strftime("%Y%j"),
-                                  (date_i + datetime.timedelta(days=1)).strftime('%Y%j'))
-
+    datarange = _daterange(datetime.date(2023, 6, 1), datetime.date(2023, 7, 1))
+    datarange = list(datarange)
+    output_files = []
+    print(len(datarange))
+    for date_i in datarange:
+       output_files.append(f"EMIS_NEI_2016_ScaledEPA_All_Anthro_OneLayer_{date_i.strftime('%Y%m%d')}")
+    out = Parallel(n_jobs=10,verbose=10)(delayed(process_emis)(
+           skeleton, tri1, tri2,CB06_map, datarange[k],lon_org,lat_org,output_files[k]) for k in range(len(datarange)))
 
