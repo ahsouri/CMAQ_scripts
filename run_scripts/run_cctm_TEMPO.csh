@@ -86,7 +86,7 @@ set TSTEP      = 010000            #> output time step interval (HHMMSS)
 if ( $PROC == serial ) then
    setenv NPCOL_NPROW "1 1"; set NPROCS   = 1 # single processor setting
 else
-   @ NPCOL  =  24; @ NPROW =  16
+   @ NPCOL = 32; @ NPROW = 20 #   @ NPCOL  =  24; @ NPROW =  16
    @ NPROCS = $NPCOL * $NPROW
    setenv NPCOL_NPROW "$NPCOL $NPROW"; 
 endif
@@ -107,7 +107,7 @@ echo ""
 echo "---CMAQ EXECUTION ID: $EXECUTION_ID ---"
 
 #> Keep or Delete Existing Output Files
-set CLOBBER_DATA = True
+set CLOBBER_DATA = TRUE
 
 #> Logfile Options
 #> Master Log File Name; uncomment to write standard output to a log, otherwise write to screen
@@ -131,13 +131,13 @@ set NCELLS = `echo "${NX} * ${NY} * ${NZ}" | bc -l`
 
 #> Output Species and Layer Options
    #> CONC file species; comment or set to "ALL" to write all species to CONC
-   setenv CONC_SPCS "CO CH4 FORM H2O2 HNO3 OH HO2 N2O5 ISOP NH3 NO NO2 NTR1 NTR2 INTR PAN PANX OPAN O3 ASO4I ANH4I ANO3I ANAI ACLI AECI AOMI AOTHRI ASO4J ANH4J ANO3J ANAJ ACLJ AECJ AOMJ AOTHRJ AFEJ AALJ ASIJ ATIJ ACAJ AMGJ AKJ AMNJ ASO4K ANH4K ANO3K ACLK ACORS ASOIL ASEACAT"
+   setenv CONC_SPCS "CO FORM H2O2 HNO3 OH HO2 N2O5 ISOP NH3 NO NO2 NTR1 NTR2 INTR PAN PANX OPAN O3"
+   setenv AVG_CONC_SPCS "ASO4I ANH4I ANO3I ANAI ACLI AECI APOCI AOTHRI ASO4J ANH4J ANO3J ANAJ ACLJ AECJ APOCJ AOTHRJ AFEJ AALJ ASIJ ATIJ ACAJ AMGJ AKJ AMNJ ASO4K ANH4K ANO3K ACLK ACORS ASOIL ASEACAT"
    #setenv CONC_BLEV_ELEV " 1 1" #> CONC file layer range; comment to write all layers to CONC
 
    #> ACONC file species; comment or set to "ALL" to write all species to ACONC
-   #setenv AVG_CONC_SPCS "O3 NO CO NO2 ASO4I ASO4J NH3 FORM" 
    ##setenv AVG_CONC_SPCS "ALL" 
-   #setenv ACONC_BLEV_ELEV " 1 1" #> ACONC file layer range; comment to write all layers to ACONC
+   setenv ACONC_BLEV_ELEV " 1 1" #> ACONC file layer range; comment to write all layers to ACONC
    #setenv AVG_FILE_ENDTIME N     #> override default beginning ACONC timestamp [ default: N ]
 
 #> Synchronization Time Step and Tolerance Options
