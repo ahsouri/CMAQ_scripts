@@ -1,0 +1,75 @@
+! Process Analysis Control File for CMAQ
+! Save all processes for O3, NO2, and FORM
+
+
+! Define process analysis for O3
+PROCESS O3_PROCESSES
+  SPECIES O3
+  
+  ! Gas-phase chemistry processes
+  PROCESS CHEM
+  PROCESS AERO
+  PROCESS CLOUD
+  
+  ! Transport processes  
+  PROCESS HADV
+  PROCESS VADV
+  PROCESS HDIF
+  PROCESS VDIF
+  
+  ! Deposition processes
+  PROCESS DDEP
+  PROCESS WDEP
+  
+  ! Emissions
+  PROCESS EMIS
+  
+END PROCESS
+
+! Define process analysis for NO2
+PROCESS NO2_PROCESSES
+  SPECIES NO2
+  
+  ! Gas-phase chemistry processes
+  PROCESS CHEM
+  PROCESS AERO
+  PROCESS CLOUD
+  
+  ! Transport processes
+  PROCESS HADV
+  PROCESS VADV  
+  PROCESS HDIF
+  PROCESS VDIF
+  
+  ! Deposition processes
+  PROCESS DDEP
+  PROCESS WDEP
+  
+  ! Emissions
+  PROCESS EMIS
+  
+END PROCESS
+
+! Define process analysis for FORM
+PROCESS FORM_PROCESSES
+  SPECIES FORM
+  
+  ! Gas-phase chemistry processes
+  PROCESS CHEM
+  PROCESS AERO
+  PROCESS CLOUD
+  
+  ! Transport processes
+  PROCESS HADV
+  PROCESS VADV
+  PROCESS HDIF
+  PROCESS VDIF
+  
+  ! Deposition processes
+  PROCESS DDEP
+  PROCESS WDEP
+  
+  ! Emissions  
+  PROCESS EMIS
+  
+END PROCESS
