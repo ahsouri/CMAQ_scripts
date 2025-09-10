@@ -9,7 +9,7 @@ from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 from scipy.spatial import cKDTree
 import xarray as xr
 import datetime
-
+from joblib import Parallel, delayed
 
 def _daterange(start_date, end_date):
     for n in range(int((end_date - start_date).days)):
@@ -227,6 +227,27 @@ def get_latlon():
     
     return lon, lat
 
+def processor(date_i):
+    emis_nei2022_file = f"./NEI_2022/local_dir/emis_mole_all_2022{date_i.month:02d}{date_i.day:02d}_12US1_nobeis_norwc_2022he_cb6_22m.ncf"
+    emis_nei2016_file = f"EMIS_NEI_2016_ScaledEPA_All_Anthro_OneLayer_{date_i.strftime('%Y%m%d')}"
+    with Dataset(emis_nei2022_file, 'r') as dataset:
+        # Iterate over all variables
+        for var_name in dataset.variables:
+            var = dataset.variables[var_name]
+            # Check if variable has 2 dimensions
+            if len(var.dimensions) == 4:
+               print(f"Processing 4D variable: {var_name}")
+               # Read data
+               data_output = np.zeros((25,1,440,710))
+               for h in range(0,25):
+                   data = var[h,0,:,:].squeeze()/12.0/12.0
+                   data_output[h,0,:,:] = _interpolosis(tri, data, lon_output, lat_output, 2, dists, 0.08)*(8.0*8.0)
+               data_output_dict.update({var_name: data_output})
+    skeleton = emis_nei2022_file
+    create_emissions_template(skeleton, f"EMIS_NEI_2022_EPA_All_Anthro_OneLayer_{date_i.strftime('%Y%m%d')}",
+                              grid_info, data_output_dict,date_i.strftime("%Y%j"),
+                                  (date_i + datetime.timedelta(days=1)).strftime('%Y%j'), emis_nei2016_file)
+    
 lon_input,lat_input = get_latlon()
 lon_output = _read_nc('/discover/nobackup/asouri/MODELS/CMAQv5.5/data/mcip/CONUS_8km/GRIDCRO2D_CONUS_8km_20230618.nc','LON')
 lat_output = _read_nc('/discover/nobackup/asouri/MODELS/CMAQv5.5/data/mcip/CONUS_8km/GRIDCRO2D_CONUS_8km_20230618.nc','LAT')
@@ -251,27 +272,10 @@ grid_info = {
 }
 
 # loop over whole days ranging from 2023 till the end of 2024
-datarange = _daterange(datetime.date(2023, 8, 1), datetime.date(2023, 8, 3))
+datarange = _daterange(datetime.date(2023, 8, 1), datetime.date(2023, 9,1))
 datarange = list(datarange)
 output_files = []
 print(len(datarange))
-for date_i in datarange:
-    emis_nei2022_file = f"./NEI_2022/local_dir/emis_mole_all_2022{date_i.month:02d}{date_i.day:02d}_12US1_nobeis_norwc_2022he_cb6_22m.ncf"
-    emis_nei2016_file = f"EMIS_NEI_2016_ScaledEPA_All_Anthro_OneLayer_{date_i.strftime('%Y%m%d')}"
-    with Dataset(emis_nei2022_file, 'r') as dataset:
-        # Iterate over all variables
-        for var_name in dataset.variables:
-            var = dataset.variables[var_name]
-            # Check if variable has 2 dimensions
-            if len(var.dimensions) == 4:
-               print(f"Processing 4D variable: {var_name}")
-               # Read data
-               data_output = np.zeros((25,1,440,710))
-               for h in range(0,25):
-                   data = var[h,0,:,:].squeeze()/12.0/12.0
-                   data_output[h,0,:,:] = _interpolosis(tri, data, lon_output, lat_output, 2, dists, 0.08)*(8.0*8.0)
-               data_output_dict.update({var_name: data_output})
-    skeleton = emis_nei2022_file
-    create_emissions_template(skeleton, f"EMIS_NEI_2022_EPA_All_Anthro_OneLayer_{date_i.strftime('%Y%m%d')}",
-                              grid_info, data_output_dict,date_i.strftime("%Y%j"),
-                                  (date_i + datetime.timedelta(days=1)).strftime('%Y%j'), emis_nei2016_file)
+out = Parallel(n_jobs=10,verbose=10)(delayed(processor)(
+           datarange[k]) for k in range(len(datarange)))
+
