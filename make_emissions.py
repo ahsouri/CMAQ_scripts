@@ -357,8 +357,8 @@ def process_emis(skeleton,tri1,tri2,CB06_map,date_i,lon_org,lat_org,output_file)
                     result = np.moveaxis(result, -1, 0)  # Now shape is (25, 487, 757)
                     data_output[var_name] = np.expand_dims(result, axis=1)
      # scaling due to the year of our target (2023) while using 2016 emissions
-     data_output['NO'] = 0.75*data_output['NO']
-     data_output['NO2'] = 0.75*data_output['NO2']
+     data_output['NO'] = 1.15*data_output['NO']
+     data_output['NO2'] = 1.15*data_output['NO2']
      create_emissions_template('./emis_mole_all_20171226_12US1_nobeis_norwc_WR413_MYR_2017.nc4',
                                   output_file,grid_info,data_output, date_i.strftime("%Y%j"),
                                   (date_i + datetime.timedelta(days=1)).strftime('%Y%j'))
@@ -398,7 +398,7 @@ if __name__ == "__main__":
     points[:, 1] = lat_scale.flatten()
     tri2 = Delaunay(points)
     # loop over whole days ranging from 2023 till the end of 2024
-    datarange = _daterange(datetime.date(2023, 9, 12), datetime.date(2024, 8, 1))
+    datarange = _daterange(datetime.date(2023, 7, 29), datetime.date(2024, 8, 1))
     datarange = list(datarange)
     output_files = []
     print(len(datarange))
