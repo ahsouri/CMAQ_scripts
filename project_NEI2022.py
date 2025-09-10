@@ -15,7 +15,7 @@ def _daterange(start_date, end_date):
     for n in range(int((end_date - start_date).days)):
         yield start_date + datetime.timedelta(n)
 
-def create_emissions_template(source_file, output_file, grid_dims, data_dict, date_value1,date_value2):
+def create_emissions_template(source_file, output_file, grid_dims, data_dict, date_value1,date_value2,emis_2016):
     """
     Create template for SMOKE emissions with new grid dimensions and populate with actual data
     
@@ -29,7 +29,7 @@ def create_emissions_template(source_file, output_file, grid_dims, data_dict, da
     
     # Open source file
     ds_source = xr.open_dataset(source_file)
-    
+    ds_nei2016 = xr.open_dataset(emis_2016)
     # Create new dataset with same global attributes
     ds_new = xr.Dataset(attrs=ds_source.attrs.copy())
     
@@ -96,21 +96,37 @@ def create_emissions_template(source_file, output_file, grid_dims, data_dict, da
         expected_shape = (new_tsteps, new_nlays, new_nrows, new_ncols)
         if final_data.shape != expected_shape:
             raise ValueError(f"Data shape {final_data.shape} doesn't match expected {expected_shape} for {species_name}")
-        
         ds_new[species_name] = xr.DataArray(
             final_data.astype(np.float32),
             dims=['TSTEP', 'LAY', 'ROW', 'COL'],
             attrs=attrs
         )
-    
+        # ds_source[species] where it's not zero, otherwise take ds_nei2016[species]
+        ds_new[species_name] = xr.where(
+           ds_new[species_name] != 0.0,
+           ds_new[species_name],
+           ds_nei2016[species_name]
+        )
+
+
     # Update global attributes for new grid
     ds_new.attrs.update({
         'NCOLS': new_ncols,
         'NROWS': new_nrows,
         'NLAYS': new_nlays,
-        'NVARS': new_nvars
+        'NVARS': new_nvars,
+        'SDATE': int(date_value1),
+        'P_ALP': 38.9799995422363,
+        'P_BET': 38.9799995422363,
+        'P_GAM': -100.212997436523,
+        'XCENT': -100.212997436523,
+        'YCENT': 38.5340003967285,
+        'XORIG': -2399755,
+        'YORIG': -1640765,
+        'XCELL': 8000,
+        'YCELL': 8000
     })
-    
+
     # Save to file
     ds_new.to_netcdf(output_file)
     
@@ -121,8 +137,6 @@ def create_emissions_template(source_file, output_file, grid_dims, data_dict, da
     print(f"Emissions file created: {output_file}")
     print(f"Grid: {new_nrows} x {new_ncols}")
     print(f"Species: {list(data_dict.keys())}")
-
-
 
 def _read_nc(filename, var):
     # reading nc files without a group
@@ -237,12 +251,13 @@ grid_info = {
 }
 
 # loop over whole days ranging from 2023 till the end of 2024
-datarange = _daterange(datetime.date(2023, 7, 25), datetime.date(2024, 8, 1))
+datarange = _daterange(datetime.date(2023, 8, 1), datetime.date(2023, 8, 3))
 datarange = list(datarange)
 output_files = []
 print(len(datarange))
 for date_i in datarange:
     emis_nei2022_file = f"./NEI_2022/local_dir/emis_mole_all_2022{date_i.month:02d}{date_i.day:02d}_12US1_nobeis_norwc_2022he_cb6_22m.ncf"
+    emis_nei2016_file = f"EMIS_NEI_2016_ScaledEPA_All_Anthro_OneLayer_{date_i.strftime('%Y%m%d')}"
     with Dataset(emis_nei2022_file, 'r') as dataset:
         # Iterate over all variables
         for var_name in dataset.variables:
@@ -251,12 +266,12 @@ for date_i in datarange:
             if len(var.dimensions) == 4:
                print(f"Processing 4D variable: {var_name}")
                # Read data
-               data_output = np.zeros_like(var)
-               data = var[:,:,:,:].squeeze()/12.0/12.0
+               data_output = np.zeros((25,1,440,710))
                for h in range(0,25):
-                   data_output[:,:,h,0] = _interpolosis(tri, data, lon_output, lat_output, 2, dists, 0.08)*(8.0*8.0)
+                   data = var[h,0,:,:].squeeze()/12.0/12.0
+                   data_output[h,0,:,:] = _interpolosis(tri, data, lon_output, lat_output, 2, dists, 0.08)*(8.0*8.0)
                data_output_dict.update({var_name: data_output})
     skeleton = emis_nei2022_file
     create_emissions_template(skeleton, f"EMIS_NEI_2022_EPA_All_Anthro_OneLayer_{date_i.strftime('%Y%m%d')}",
                               grid_info, data_output_dict,date_i.strftime("%Y%j"),
-                                  (date_i + datetime.timedelta(days=1)).strftime('%Y%j'))
+                                  (date_i + datetime.timedelta(days=1)).strftime('%Y%j'), emis_nei2016_file)
