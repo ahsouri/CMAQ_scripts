@@ -96,12 +96,13 @@ def aircraft_reader(filename: str, year: int, NO2_string: str, HCHO_string: str)
 def AQS_reader(filename: str):
     # read the header
     data = pd.read_csv(filename)
+    data = data.loc[data['Parameter Name'] == 'Relative Humidity ']
     # read the data
     lat = np.array(data["Latitude"])
     lon = np.array(data["Longitude"])
     lon[lon > 180.0] = lon[lon > 180.0] - 360.0
-    airtemp = np.array(data["Sample Measurement"]) 
-    airtemp = (airtemp - 32.0)*(5.0/9.0) # far to deg
+    airtemp = np.array(data["Sample Measurement"])
+    #airtemp = (airtemp - 32.0)*(5.0/9.0) # far to deg
     # convert doy and utc to datetime
     data["DateTime_GMT"] = pd.to_datetime(data["Date GMT"] + " " + data["Time GMT"])
     date = pd.to_datetime(data["DateTime_GMT"]).to_list()
@@ -121,41 +122,31 @@ def wrf_reader_core(met_file_2d_file):
         time_unit = time_unit["units"]
         dates = num2date(time_var, time_unit)                # convert to datetime objects
         time = list(dates)
-        TEMP2 = _read_nc(met_file_2d_file,'T2').astype('float32')-273.15
+        #TEMP2 = _read_nc(met_file_2d_file,'T2').astype('float32')-273.15
+        PB    = _read_nc(met_file_2d_file,'PSFC')      # base state pressure (Pa)
+        T     = _read_nc(met_file_2d_file,'T2')       # perturbation potential temp (K)
+        QV    = _read_nc(met_file_2d_file,'Q2')  # water vapor mixing ratio (kg/kg)
+
+        Rd_cp = 0.2854
+        PB = PB / 100.0
+
+        # actual vapor pressure (hPa)
+        e = (QV * PB) / (0.622 + QV)
+
+        # saturation vapor pressure over water (hPa)
+        es = 6.112 * np.exp((17.67*(T-273.15))/(T-29.65))
+
+        # relative humidity (%)
+        RH = 100.0 * e/es
+
         # read gas in ppbv
         #gas_hcho = _read_nc(cmaq_target_file, 'FORM')*1000.0  # ppb
         #gas_hcho = gas_hcho.astype('float32')
         #gas_no2 = _read_nc(cmaq_target_file, 'NO2')*1000.0  # ppb
         #gas_no2 = gas_no2.astype('float32')
         # populate cmaq_data format
-        cmaq_data = ctm_model(lat[0,:,:].squeeze(), lon[0,:,:].squeeze(), time, [], [], [], [], [], [], TEMP2, 'CMAQ')
+        cmaq_data = ctm_model(lat[0,:,:].squeeze(), lon[0,:,:].squeeze(), time, [], [], [], [], [], [], RH, 'CMAQ')
         return cmaq_data
-
-def met_reader_core(met_file_2d_file):
-
-        print("Currently reading: " + met_file_2d_file.split('/')[-1])
-        # reading time and coordinates
-        lat = _read_nc(met_file_2d_file, 'XLAT_M')
-        lon = _read_nc(met_file_2d_file, 'XLONG_M')
-        nc_f = met_file_2d_file
-        nc_fid = Dataset(nc_f, 'r')
-        time_var = (nc_fid.variables['Times'])
-        time_strings = [''.join([char.decode() for char in time_row]) for time_row in time_var]
-        time_strings = time_strings[0]
-        nc_fid.close()
-        dates = datetime.datetime.strptime(time_strings, "%Y-%m-%d_%H:%M:%S")
-        time = [dates]
-        TEMP2 = _read_nc(met_file_2d_file,'TT').astype('float32')-273.15
-        TEMP2 = TEMP2[0,:,:].squeeze()
-        # read gas in ppbv
-        #gas_hcho = _read_nc(cmaq_target_file, 'FORM')*1000.0  # ppb
-        #gas_hcho = gas_hcho.astype('float32')
-        #gas_no2 = _read_nc(cmaq_target_file, 'NO2')*1000.0  # ppb
-        #gas_no2 = gas_no2.astype('float32')
-        # populate cmaq_data format
-        cmaq_data = ctm_model(lat, lon, time, [], [], [], [], [], [], TEMP2, 'CMAQ')
-        return cmaq_data
-
 
 def cmaq_reader_core(met_file_2d_file,grd_file_2d_file):
         
@@ -176,14 +167,30 @@ def cmaq_reader_core(met_file_2d_file,grd_file_2d_file):
         #prs = _read_nc(met_file_3d_file, 'PRES').astype('float32')/100.0  # hPa
         #PBLH = _read_nc(met_file_2d_file, 'PBL').astype('float32')
         #ZL = _read_nc(met_file_3d_file, 'ZH').astype('float32')
-        TEMP2 = _read_nc(met_file_2d_file,'TEMP2').astype('float32')-273.15
+        PB    = _read_nc(met_file_2d_file,'PSFC')      # base state pressure (Pa)
+        T     = _read_nc(met_file_2d_file,'T2')       # perturbation potential temp (K)
+        QV    = _read_nc(met_file_2d_file,'Q2')  # water vapor mixing ratio (kg/kg)
+
+        Rd_cp = 0.2854
+        PB = PB / 100.0
+
+        # actual vapor pressure (hPa)
+        e = (QV * PB) / (0.622 + QV)  
+
+        # saturation vapor pressure over water (hPa)
+        es = 6.112 * np.exp((17.67*(T-273.15))/(T-29.65))
+
+        # relative humidity (%) 
+        RH = 100.0 * e/es
+        print(RH)
+        exit()
         # read gas in ppbv
         #gas_hcho = _read_nc(cmaq_target_file, 'FORM')*1000.0  # ppb
         #gas_hcho = gas_hcho.astype('float32')
         #gas_no2 = _read_nc(cmaq_target_file, 'NO2')*1000.0  # ppb
         #gas_no2 = gas_no2.astype('float32')        
         # populate cmaq_data format
-        cmaq_data = ctm_model(lat, lon, time, [], [], [], [], [], [], TEMP2, 'CMAQ')
+        cmaq_data = ctm_model(lat, lon, time, [], [], [], [], [], [], RH, 'CMAQ')
         return cmaq_data
 
 def mcip_reader(dir_mcip: str, dir_cmaq: str, YYYYMM: str) -> list:
@@ -230,26 +237,6 @@ def wrf_reader(dir_wrf: str, YYYYMM: str) -> list:
 
     return outputs
 
-def met_reader(dir_wrf: str, YYYYMM: str) -> list:
-    '''
-       MINDS reader
-       Inputs:
-             product_dir [str]: the folder containing the GMI data
-             YYYYMM [str]: the target month and year, e.g., 202005 (May 2020)
-       Output:
-             minds_fields [ctm_model]: a dataclass format
-    '''
-    # read meteorological and chemical fields
-    met_files_2d = sorted(
-            glob.glob(dir_wrf + "/met_em.d01." + YYYYMM[0:4] + '-' + YYYYMM[4:]  + "*"))
-    #met_files_3d = sorted(glob.glob(dir_mcip + "/METCRO3D_*" + YYYYMM  + "*"))
-    # define gas profiles for saving
-    outputs = []
-    for k in range(len(met_files_2d)):
-        outputs.append(met_reader_core(met_files_2d[k]))
-
-    return outputs
-
 def colocate(ctmdata, airdata, date1, date2):
     '''
        Colocate the model and the aircraft based on the nearest neighbour
@@ -293,7 +280,7 @@ def colocate(ctmdata, airdata, date1, date2):
            continue
         if (airdata.time[t1]<pd.Timestamp(date1) or airdata.time[t1]>pd.Timestamp(date2)):
             continue
-        if (airdata.state[t1] != 'Georgia'):
+        if (airdata.state[t1] != 'Tennessee'):
             continue
         # for t1 in range(0, 2500):
         # find the closest day
@@ -333,19 +320,18 @@ def colocate(ctmdata, airdata, date1, date2):
     output["lon"] = np.array(airdata_lon_mapped)
     output["lat"] = np.array(airdata_lat_mapped)
     #output["state"] = airdata.state
-    savemat('./AQS_georgia_obsgrid_pleim.mat', output)
+    savemat('./AQS_ten_old_RH.mat', output)
     return None
 
 
 if __name__ == "__main__":
-    AQS_files = sorted(glob.glob("./hourly_TEMP_2023.csv"))
+    AQS_files = sorted(glob.glob("./hourly_RH_DP_2023.csv"))
     for file in AQS_files:
            aircraft_data1 = AQS_reader(file)
            split_file = file.split('_')
-           wrf_data = wrf_reader('./wrfout/', "202306")
+           wrf_data = wrf_reader('./wrfout_old/', "202306")
            #mcip_data = mcip_reader('./cmaq_mcip/','./cmaq_mcip/',"202306")
-           #met_data = met_reader('./NARR',"202306")
-           spiral_data = colocate(wrf_data, aircraft_data1,"2023-06-01","2023-06-10")
+           spiral_data = colocate(wrf_data, aircraft_data1,"2023-06-01","2023-06-09")
            spiral_data = []
            cmaq_data = []
            aircraft_data1 = []

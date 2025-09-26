@@ -398,7 +398,7 @@ if __name__ == "__main__":
     points[:, 1] = lat_scale.flatten()
     tri2 = Delaunay(points)
     # loop over whole days ranging from 2023 till the end of 2024
-    datarange = _daterange(datetime.date(2023, 7, 29), datetime.date(2024, 8, 1))
+    datarange = _daterange(datetime.date(2023, 6, 1), datetime.date(2023, 7, 1))
     datarange = list(datarange)
     output_files = []
     print(len(datarange))

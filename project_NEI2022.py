@@ -102,11 +102,23 @@ def create_emissions_template(source_file, output_file, grid_dims, data_dict, da
             attrs=attrs
         )
         # ds_source[species] where it's not zero, otherwise take ds_nei2016[species]
-        ds_new[species_name] = xr.where(
-           ds_new[species_name] != 0.0,
-           ds_new[species_name],
-           ds_nei2016[species_name]
-        )
+        var_list = [
+          "ACET", "ACROLEIN", "ALD2", "ALD2_PRIMARY", "ALDX", "BENZ", "BUTADIENE13",
+          "CH4", "CH4_INV", "CL2", "CO", "CO2_INV", "ETH", "ETHA", "ETHY", "ETOH",
+          "FORM", "FORM_PRIMARY", "HCL", "HONO", "IOLE", "ISOP", "IVOC", "KET",
+          "MEOH", "N2O_INV", "NAPH", "NH3", "NH3_FERT", "NO", "NO2", "NVOL", "OLE",
+          "PAL", "PAR", "PCA", "PCL", "PEC", "PFE", "PH2O", "PK", "PMC", "PMG", "PMN",
+          "PMOTHR", "PNA", "PNCOM", "PNH4", "PNO3", "POC", "PRPA", "PSI", "PSO4",
+          "PTI", "SO2", "SOAALK", "SULF", "TERP", "TOG_INV", "TOL", "UNK", "UNR",
+          "VOC_INV", "XYLMN"]
+        if species_name in var_list:
+           old_attrs = ds_new[species_name].attrs
+           ds_new[species_name] = xr.where(
+              ds_new[species_name] != 0.0,
+              ds_new[species_name],
+              ds_nei2016[species_name]
+           )
+           ds_new[species_name].attrs = old_attrs 
 
 
     # Update global attributes for new grid
@@ -242,6 +254,8 @@ def processor(date_i):
                for h in range(0,25):
                    data = var[h,0,:,:].squeeze()/12.0/12.0
                    data_output[h,0,:,:] = _interpolosis(tri, data, lon_output, lat_output, 2, dists, 0.08)*(8.0*8.0)
+               if var_name in ["NO","NO2"]:
+                  data_output = data_output*1.8
                data_output_dict.update({var_name: data_output})
     skeleton = emis_nei2022_file
     create_emissions_template(skeleton, f"EMIS_NEI_2022_EPA_All_Anthro_OneLayer_{date_i.strftime('%Y%m%d')}",
@@ -272,7 +286,7 @@ grid_info = {
 }
 
 # loop over whole days ranging from 2023 till the end of 2024
-datarange = _daterange(datetime.date(2023, 8, 1), datetime.date(2023, 9,1))
+datarange = _daterange(datetime.date(2023, 6, 1), datetime.date(2023, 10,1))
 datarange = list(datarange)
 output_files = []
 print(len(datarange))
