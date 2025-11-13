@@ -56,6 +56,7 @@ echo 'Start Model Run At ' `date`
 #> Set Working, Input, and Output Directories
  setenv WORKDIR ${CMAQ_HOME}/CCTM/scripts          #> Working Directory. Where the runscript is.
  setenv OUTDIR  ${CMAQ_DATA}/output_CCTM_${RUNID}  #> Output Directory
+#setenv OUTDIR  ${CMAQ_DATA}/output_test_emiss/
  setenv INPDIR  ${CMAQ_DATA}/            #> Input Directory
  setenv LOGDIR  ${OUTDIR}/LOGS     #> Log Directory Location
  setenv NMLpath ${BLD}             #> Location of Namelists. Common places are: 
@@ -74,8 +75,8 @@ echo 'Start Model Run At ' `date`
 
 #> Set Start and End Days for looping
  setenv NEW_START TRUE             #> Set to FALSE for model restart
- set START_DATE = "2023-06-01"     #> beginning date (July 1, 2016)
- set END_DATE   = "2023-06-02"     #> ending date    (July 1, 2016)
+ set START_DATE = "2023-10-23"     #> beginning date (July 1, 2016)
+ set END_DATE   = "2023-10-25"     #> ending date    (July 1, 2016)
 
 #> Set Timestepping Parameters
 set STTIME     = 000000            #> beginning GMT time (HHMMSS)
@@ -86,7 +87,7 @@ set TSTEP      = 010000            #> output time step interval (HHMMSS)
 if ( $PROC == serial ) then
    setenv NPCOL_NPROW "1 1"; set NPROCS   = 1 # single processor setting
 else
-   @ NPCOL = 32; @ NPROW = 20 #   @ NPCOL  =  24; @ NPROW =  16
+   @ NPCOL  =  24; @ NPROW =  18
    @ NPROCS = $NPCOL * $NPROW
    setenv NPCOL_NPROW "$NPCOL $NPROW"; 
 endif
@@ -131,7 +132,7 @@ set NCELLS = `echo "${NX} * ${NY} * ${NZ}" | bc -l`
 
 #> Output Species and Layer Options
    #> CONC file species; comment or set to "ALL" to write all species to CONC
-   setenv CONC_SPCS "CO FORM H2O2 HNO3 OH HO2 N2O5 ISOP NH3 NO NO2 NTR1 NTR2 INTR PAN PANX OPAN O3"
+   setenv CONC_SPCS "CO FORM OH HO2 NO NO2 O3"
    setenv AVG_CONC_SPCS "ASO4I ANH4I ANO3I ANAI ACLI AECI APOCI AOTHRI ASO4J ANH4J ANO3J ANAJ ACLJ AECJ APOCJ AOTHRJ AFEJ AALJ ASIJ ATIJ ACAJ AMGJ AKJ AMNJ ASO4K ANH4K ANO3K ACLK ACORS ASOIL ASEACAT"
    #setenv CONC_BLEV_ELEV " 1 1" #> CONC file layer range; comment to write all layers to CONC
 
@@ -141,8 +142,8 @@ set NCELLS = `echo "${NX} * ${NY} * ${NZ}" | bc -l`
    #setenv AVG_FILE_ENDTIME N     #> override default beginning ACONC timestamp [ default: N ]
 
 #> Synchronization Time Step and Tolerance Options
-setenv CTM_MAXSYNC 720       #> max sync time step (sec) [ default: 720 ]
-setenv CTM_MINSYNC  60       #> min sync time step (sec) [ default: 60 ]
+setenv CTM_MAXSYNC 600       #> max sync time step (sec) [ default: 720 ]
+setenv CTM_MINSYNC  10       #> min sync time step (sec) [ default: 60 ]
 setenv SIGMA_SYNC_TOP 0.7    #> top sigma level thru which sync step determined [ default: 0.7 ] 
 #setenv ADV_HDIV_LIM 0.95    #> maximum horiz. div. limit for adv step adjust [ default: 0.9 ]
 setenv CTM_ADV_CFL 0.95      #> max CFL [ default: 0.75]
@@ -366,7 +367,7 @@ while ($TODAYJ <= $STOP_DAY )  #>Compare dates in terms of YYYYJJJ
   setenv GR_EMIS_LAB_001 GR_RES_FIRES
   setenv GR_EM_SYM_DATE_001 F # To change default behaviour please see Users Guide for EMIS_SYM_DATE
 
-  set EMISfile  = EMIS_NEI_2016_ScaledEPA_All_Anthro_OneLayer_${YYYYMMDD}
+  set EMISfile  = EMIS_NEI_2022_EPA_All_Anthro_OneLayer_${YYYYMMDD}
   setenv GR_EMIS_002 ${EMISpath}/${EMISfile}
   setenv GR_EMIS_LAB_002 GRIDDED_EMIS
   setenv GR_EM_SYM_DATE_002 F # To change default behaviour please see Users Guide for EMIS_SYM_DATE

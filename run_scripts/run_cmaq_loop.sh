@@ -4,8 +4,8 @@
 # This script submits CMAQ jobs for each day, with dependencies between days
 
 # Set your date range
-START_DATE="2023-06-01"
-END_DATE="2023-06-05"
+START_DATE="2024-05-26"
+END_DATE="2024-06-01"
 CMAQ_RUN_SCRIPT="./run_cctm_TEMPO.csh"  # Path to your CMAQ run script
 
 # Create directories for organization
@@ -20,19 +20,18 @@ echo "Created backup: $BACKUP_SCRIPT"
 
 # Initialize variables
 current_date=$START_DATE
-is_first_day=true
+is_first_day=false
 previous_job_id=""
 
 echo "Setting up CMAQ daily jobs from $START_DATE to $END_DATE"
 
 # Loop through each day
-while [ "$current_date" != $(date -I -d "$END_DATE + 1 day") ]; do
+while [[ "$current_date" < $(date -I -d "$END_DATE + 1 day") ]]; do
     
     echo "Preparing job for date: $current_date"
     
     # Calculate next day for END_DATE
-    next_date=$(date -I -d "$current_date + 1 day")
-    
+    next_date=$(date -I -d "$current_date + 6 day")
     # Create batch script for this day
     batch_script="${SCRIPT_DIR}/run_cmaq_${current_date}.sh"
     
@@ -44,12 +43,12 @@ while [ "$current_date" != $(date -I -d "$END_DATE + 1 day") ]; do
 
 #SBATCH -J CMAQ_${current_date}
 ##SBATCH --qos=debug
-#SBATCH --constraint="mil"
-#SBATCH --account=s1043
-#SBATCH --ntasks=6
-#SBATCH --cpus-per-task=120
+##SBATCH --constraint="mil"
+#SBATCH --account=s3223
+#SBATCH --ntasks=480
+##SBATCH --cpus-per-task=120
 ##SBATCH --mem=24G
-#SBATCH -t 2:00:00
+#SBATCH -t 6:30:00
 #SBATCH -o ${LOG_DIR}/cmaq_${current_date}-%j.out
 #SBATCH -e ${LOG_DIR}/cmaq_${current_date}-%j.err
 
@@ -106,7 +105,7 @@ EOF
     echo "  -> Submitted job for $current_date (runs until $next_date) with Job ID: $job_id"
     
     # Move to next day
-    current_date=$(date -I -d "$current_date + 1 day")
+    current_date=$(date -I -d "$current_date + 7 day")
     echo ""
     
 done
