@@ -280,7 +280,7 @@ def colocate(ctmdata, airdata, date1, date2):
            continue
         if (airdata.time[t1]<pd.Timestamp(date1) or airdata.time[t1]>pd.Timestamp(date2)):
             continue
-        if (airdata.state[t1] != 'Tennessee'):
+        if (airdata.state[t1] != 'Georgia'):
             continue
         # for t1 in range(0, 2500):
         # find the closest day
@@ -320,7 +320,7 @@ def colocate(ctmdata, airdata, date1, date2):
     output["lon"] = np.array(airdata_lon_mapped)
     output["lat"] = np.array(airdata_lat_mapped)
     #output["state"] = airdata.state
-    savemat('./AQS_ten_old_RH.mat', output)
+    savemat('./AQS_georgia__RH.mat', output)
     return None
 
 
@@ -329,9 +329,9 @@ if __name__ == "__main__":
     for file in AQS_files:
            aircraft_data1 = AQS_reader(file)
            split_file = file.split('_')
-           wrf_data = wrf_reader('./wrfout_old/', "202306")
+           wrf_data = wrf_reader('./wrfout/', "202308")
            #mcip_data = mcip_reader('./cmaq_mcip/','./cmaq_mcip/',"202306")
-           spiral_data = colocate(wrf_data, aircraft_data1,"2023-06-01","2023-06-09")
+           spiral_data = colocate(wrf_data, aircraft_data1,"2023-08-01","2023-08-05")
            spiral_data = []
            cmaq_data = []
            aircraft_data1 = []

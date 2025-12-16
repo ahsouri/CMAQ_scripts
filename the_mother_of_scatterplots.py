@@ -13,7 +13,7 @@ from sklearn.linear_model import TheilSenRegressor,LinearRegression
 # -------------------------------
 # Example data
 # -------------------------------
-nc_f = './NO2_202307.nc'
+nc_f = './diag_test_cmaq_nei22/NO2_202308.nc'
 nc_fid = Dataset(nc_f,'r')
 no2_cmaq = nc_fid.variables["ctm_averaged_vcd_prior"]
 no2_trop = nc_fid.variables["sat_averaged_vcd"]
@@ -24,7 +24,7 @@ mask = ~np.isnan(x) & ~np.isnan(y)
 x = x[mask]
 y = y[mask]
 error = np.array(no2_trop_std).flatten()
-error_x = error[mask]
+error = error[mask]
 # -------------------------------
 # Metrics
 # -------------------------------
@@ -42,10 +42,6 @@ slope = linear_model.coef_[0]
 intercept = linear_model.intercept_
 r_value, _ = stats.pearsonr(x, y)
 r2 = r_value**2
-
-# york fit
-#error_y = 0.1*y
-#intercept, slope, _, _ = bivariate_fit(x, y, error_x, error_y, ri=0.0, b0=1.0, maxIter=1e6)
 
 # Subsample points for KDE to make it faster
 #sub_idx = np.random.choice(len(x), size=5000, replace=False)
@@ -66,19 +62,29 @@ fig, ax = plt.subplots(figsize=(7, 7))
 
 # Scatter plot with density coloring
 #sc = ax.scatter(x, y, c=density, cmap='plasma', s=5)
-ax.scatter(
+#ax.scatter(
+#    x, y,
+#    s=30,                 # small marker size
+#    alpha=0.005,           # transparency
+#    color="black",         # base color
+#)
+hb = ax.hexbin(
     x, y,
-    s=30,                 # small marker size
-    alpha=0.005,           # transparency
-    color="black",         # base color
+    gridsize=200,          # resolution of hexagons
+    cmap='plasma',         # choose a nice color map
+    bins='log',             # log color scale for large dynamic range
+    extent=[-1, max(x.max(), y.max()), -1, max(x.max(), y.max())]
 )
+
+#cb = plt.colorbar(hb, ax=ax)
+#cb.set_label('log10(N points)')
 # y = x reference line
 lims = [0, max(x.max(), y.max())]
 ax.plot(lims, lims, 'k--', alpha=0.7, label='y = x')
 # linear fit line
 fit_x = np.linspace(lims[0], lims[1], 100)
 fit_y = slope * fit_x + intercept
-ax.plot(fit_x, fit_y, 'r-', label=f'York fit')
+ax.plot(fit_x, fit_y, 'r-', label=f'Fit')
 
 # One-sigma bounds (approx.)
 sigma = np.std(y - (slope*x + intercept))

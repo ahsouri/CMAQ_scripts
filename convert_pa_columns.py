@@ -21,9 +21,9 @@ def _calculate_ctm_partial_column(deltap, profile):
     Mair = 28.97e-3
     g = 9.80665
     N_A = 6.02214076e23
-    return deltap * profile / g / Mair * N_A * 1e-4 * 1e-15 * 100.0 * 1e-9
+    return deltap[0:24,...] * profile[0:24,...]*1e3 / g / Mair * N_A * 1e-4 * 1e-15 * 100.0 * 1e-9
 
-def CMAQ_PA_reader(fname_cro3d,fname_cro2d,fname_pa):
+def CMAQ_PA_reader(fname_cro3d,fname_cro2d,fname_pa,date_str):
 
     print("Currently reading: " + fname_pa.split('/')[-1])
     # reading time and coordinates
@@ -39,7 +39,6 @@ def CMAQ_PA_reader(fname_cro3d,fname_cro2d,fname_pa):
         else:  # the between
             delp[:, i, :, :] = (prs[:, i, :, :] + prs[:, i-1, :, :]) * \
                     0.5 - (prs[:, i+1, :, :] + prs[:, i, :, :])*0.5
-
     var_col={}
     with Dataset(fname_pa, 'r') as dataset:
          for var_name in dataset.variables:
@@ -58,13 +57,13 @@ def CMAQ_PA_reader(fname_cro3d,fname_cro2d,fname_pa):
     grid_info = {
        'nrows': 440,
        'ncols': 710,
-       'tsteps': 25,
+       'tsteps': 24,
        'nlays': 1
     }
     # Set up new dimensions
     new_nrows = grid_info['nrows']
     new_ncols = grid_info['ncols']
-    new_tsteps = grid_info.get('tsteps', 25)
+    new_tsteps = grid_info.get('tsteps', 24)
     new_nlays = grid_info.get('nlays', 1)
     new_nvars = len(var_col)
     
@@ -125,19 +124,19 @@ def CMAQ_PA_reader(fname_cro3d,fname_cro2d,fname_pa):
         'NVARS': new_nvars
     })    
     # Save to file
-    ds_new.to_netcdf("COLUMN_" + fname_pa)
+    ds_new.to_netcdf("./COLUMN_PA_" + date_str + ".nc")
     # Close datasets
     ds_source.close()
-    ds_new.close()           
+    ds_new.close()
 
 if __name__ == "__main__":
 
-    datarange = _daterange(datetime.date(2023, 10, 1), datetime.date(2023, 10, 2))
+    datarange = _daterange(datetime.date(2024, 5, 15), datetime.date(2024, 10, 1))
     datarange = list(datarange)
-    mcip_dir = 
-    cctm_dir = 
+    mcip_dir = "/discover/nobackup/asouri/MODELS/CMAQv5.5/data/mcip/CONUS_8km"
+    cctm_dir = "/discover/nobackup/asouri/MODELS/CMAQv5.5/data/output_CCTM_v55_intel_CONUS_8km"
     for date in datarange:
-        met_cro2d = f"{mcip_dir}/METCRO2D_{date.strftime('%Y%m%d')}.nc"
-        met_cro3d = f"{mcip_dir}/METCRO3D_{date.strftime('%Y%m%d')}.nc"
+        met_cro2d = f"{mcip_dir}/METCRO2D_CONUS_8km_{date.strftime('%Y%m%d')}.nc"
+        met_cro3d = f"{mcip_dir}/METCRO3D_CONUS_8km_{date.strftime('%Y%m%d')}.nc"
         pa_file = f"{cctm_dir}/CCTM_PA_1_v55_intel_CONUS_8km_{date.strftime('%Y%m%d')}.nc"
-        CMAQ_PA_reader(met_cro3d,met_cro2d,pa_file)
+        CMAQ_PA_reader(met_cro3d,met_cro2d,pa_file,date.strftime('%Y%m%d'))
