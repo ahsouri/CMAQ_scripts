@@ -22,7 +22,55 @@ def _calculate_ctm_partial_column(deltap, profile):
     g = 9.80665
     N_A = 6.02214076e23
     return deltap[0:24,...] * profile[0:24,...]*1e3 / g / Mair * N_A * 1e-4 * 1e-15 * 100.0 * 1e-9
+def get_tropopause_from_mcip(ds, min_height=5000.0):
+    """
+    Estimate thermal tropopause from MCIP fields using lapse rate criterion.
 
+    Inputs:
+        ds["TA"]   : air temperature [K], dims usually TSTEP, LAY, ROW, COL
+        ds["ZF"]   : full-layer height [m]
+        ds["PRES"] : pressure [Pa]
+
+    Returns:
+        trop_z : tropopause height [m]
+        trop_p : tropopause pressure [Pa]
+    """
+
+    T = ds["TA"]       # K
+    z = ds["ZF"]       # m
+    p = ds["PRES"]     # Pa
+
+    # dT/dz [K/m]
+    dT = T.diff("LAY")
+    dz = z.diff("LAY")
+
+    lapse = -dT / dz * 1000.0   # K/km
+
+    # midpoint height/pressure between layers
+    z_mid = 0.5 * (z.isel(LAY=slice(1, None)) + z.isel(LAY=slice(0, -1)))
+    p_mid = 0.5 * (p.isel(LAY=slice(1, None)) + p.isel(LAY=slice(0, -1)))
+
+    # Find levels above minimum height where lapse rate <= 2 K/km
+    candidate = (lapse <= 2.0) & (z_mid >= min_height)
+
+    # First valid level along vertical dimension
+    first_idx = candidate.argmax("LAY")
+
+    # Check if each column actually has a candidate
+    has_trop = candidate.any("LAY")
+
+    trop_z = z_mid.isel(LAY=first_idx).where(has_trop)
+    trop_p = p_mid.isel(LAY=first_idx).where(has_trop)
+
+    trop_z.name = "TROP_Z"
+    trop_p.name = "TROP_P"
+
+    trop_z.attrs["units"] = "m"
+    trop_p.attrs["units"] = "Pa"
+    trop_z.attrs["description"] = "Estimated thermal tropopause height from MCIP TA/ZF"
+    trop_p.attrs["description"] = "Estimated thermal tropopause pressure from MCIP TA/ZF/PRES"
+
+    return trop_z, trop_p
 def CMAQ_PA_reader(fname_cro3d,fname_cro2d,fname_pa,date_str):
 
     print("Currently reading: " + fname_pa.split('/')[-1])
@@ -30,6 +78,8 @@ def CMAQ_PA_reader(fname_cro3d,fname_cro2d,fname_pa,date_str):
     prs = _read_nc(fname_cro3d, 'PRES').astype('float32')/100.0  # hPa
     surf_prs = _read_nc(fname_cro2d, 'PRSFC').astype('float32')/100.0
     delp = prs.copy()
+    ds = xr.open_dataset(fname_cro3d)
+    trop_z, trop_p = get_tropopause_from_mcip(ds)
     # calculate delta pressure
     for i in range(0, np.shape(prs)[1]):
         if i == 0:  # the first layer
@@ -39,6 +89,9 @@ def CMAQ_PA_reader(fname_cro3d,fname_cro2d,fname_pa,date_str):
         else:  # the between
             delp[:, i, :, :] = (prs[:, i, :, :] + prs[:, i-1, :, :]) * \
                     0.5 - (prs[:, i+1, :, :] + prs[:, i, :, :])*0.5
+    trop_p_np = np.asarray(trop_p)
+    delp_trop = delp.copy()
+    delp_trop[prs < trop_p_np[:, None, :, :]/100.0] = 0.0
     var_col={}
     with Dataset(fname_pa, 'r') as dataset:
          for var_name in dataset.variables:
@@ -46,7 +99,10 @@ def CMAQ_PA_reader(fname_cro3d,fname_cro2d,fname_pa,date_str):
              # Check if variable has 2 dimensions
              if len(var.dimensions) == 4:
                 print(f"Processing 4D variable: {var_name}")
-                var_col[var_name] = np.sum(_calculate_ctm_partial_column(delp,np.array(var[:])),axis=1).squeeze()
+                if ("FORM" not in var_name) and ("O3" not in var_name):
+                   var_col[var_name] = np.sum(_calculate_ctm_partial_column(delp_trop,np.array(var[:])),axis=1).squeeze()
+                else:
+                   var_col[var_name] = np.sum(_calculate_ctm_partial_column(delp,np.array(var[:])),axis=1).squeeze()
     
     # Open source file
     ds_source = xr.open_dataset(fname_pa)
@@ -131,9 +187,9 @@ def CMAQ_PA_reader(fname_cro3d,fname_cro2d,fname_pa,date_str):
 
 if __name__ == "__main__":
 
-    datarange = _daterange(datetime.date(2024, 8, 10), datetime.date(2024, 10, 1))
+    datarange = _daterange(datetime.date(2024, 9, 24), datetime.date(2024, 10, 1))
     datarange = list(datarange)
-    mcip_dir = "/discover/nobackup/asouri/MODELS/CMAQv5.5/data/mcip/CONUS_8km"
+    mcip_dir = "/discover/nobackup/asouri/MODELS/CMAQv5.5/data/mcip/CONUS_8km_compressed"
     cctm_dir = "/discover/nobackup/asouri/MODELS/CMAQv5.5/data/output_CCTM_v55_intel_CONUS_8km"
     for date in datarange:
         met_cro2d = f"{mcip_dir}/METCRO2D_CONUS_8km_{date.strftime('%Y%m%d')}.nc"

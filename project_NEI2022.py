@@ -240,7 +240,7 @@ def get_latlon():
     return lon, lat
 
 def processor(date_i):
-    emis_nei2022_file = f"./NEI_2022/local_dir/emis_mole_all_2022{date_i.month:02d}{date_i.day:02d}_12US1_nobeis_norwc_2022he_cb6_22m.ncf"
+    emis_nei2022_file = f"/discover/nobackup/asouri/GITS/CMAQ_scripts/epa_2022/emis_mole_all_2022{date_i.month:02d}{date_i.day:02d}_12US1_nobeis_norwc_2022he_cb6_22m.ncf"
     emis_nei2016_file = f"EMIS_NEI_2016_ScaledEPA_All_Anthro_OneLayer_{date_i.strftime('%Y%m%d')}"
     with Dataset(emis_nei2022_file, 'r') as dataset:
         # Iterate over all variables
@@ -263,8 +263,8 @@ def processor(date_i):
                                   (date_i + datetime.timedelta(days=1)).strftime('%Y%j'), emis_nei2016_file)
     
 lon_input,lat_input = get_latlon()
-lon_output = _read_nc('/discover/nobackup/asouri/MODELS/CMAQv5.5/data/mcip/CONUS_8km/GRIDCRO2D_CONUS_8km_20230718.nc','LON')
-lat_output = _read_nc('/discover/nobackup/asouri/MODELS/CMAQv5.5/data/mcip/CONUS_8km/GRIDCRO2D_CONUS_8km_20230718.nc','LAT')
+lon_output = _read_nc('/discover/nobackup/asouri/MODELS/CMAQv5.5/data/mcip/CONUS_8km_compressed/GRIDCRO2D_CONUS_8km_20230718.nc','LON')
+lat_output = _read_nc('/discover/nobackup/asouri/MODELS/CMAQv5.5/data/mcip/CONUS_8km_compressed/GRIDCRO2D_CONUS_8km_20230718.nc','LAT')
 points = np.zeros((np.size(lon_input), 2))
 points[:, 0] = lon_input.flatten()
 points[:, 1] = lat_input.flatten()
@@ -286,10 +286,10 @@ grid_info = {
 }
 
 # loop over whole days ranging from 2023 till the end of 2024
-datarange = _daterange(datetime.date(2024, 3, 1), datetime.date(2024, 10,1))
+datarange = _daterange(datetime.date(2024, 2, 1), datetime.date(2024, 5,1))
 datarange = list(datarange)
 output_files = []
 print(len(datarange))
-out = Parallel(n_jobs=10,verbose=10)(delayed(processor)(
+out = Parallel(n_jobs=6,verbose=10)(delayed(processor)(
            datarange[k]) for k in range(len(datarange)))
 

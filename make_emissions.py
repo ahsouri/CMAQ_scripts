@@ -398,12 +398,12 @@ if __name__ == "__main__":
     points[:, 1] = lat_scale.flatten()
     tri2 = Delaunay(points)
     # loop over whole days ranging from 2023 till the end of 2024
-    datarange = _daterange(datetime.date(2023, 7, 1), datetime.date(2024, 10, 1))
+    datarange = _daterange(datetime.date(2023, 6, 1), datetime.date(2024, 6, 1))
     datarange = list(datarange)
     output_files = []
     print(len(datarange))
     for date_i in datarange:
        output_files.append(f"EMIS_NEI_2016_ScaledEPA_All_Anthro_OneLayer_{date_i.strftime('%Y%m%d')}")
-    out = Parallel(n_jobs=10,verbose=10)(delayed(process_emis)(
+    out = Parallel(n_jobs=6,verbose=10)(delayed(process_emis)(
            skeleton, tri1, tri2,CB06_map, datarange[k],lon_org,lat_org,output_files[k]) for k in range(len(datarange)))
 
